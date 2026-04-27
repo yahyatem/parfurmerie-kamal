@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { Menu, Search, ShoppingCart, SlidersHorizontal } from "lucide-react";
 
 type ShopHeaderProps = {
@@ -25,8 +26,8 @@ export default function ShopHeader({ onMenuOpen, cartCount }: ShopHeaderProps) {
           <p className="text-[11px] text-rose-100">Cosmetiques & Parfums</p>
         </div>
 
-        <button
-          type="button"
+        <Link
+          href="/panier"
           className="relative inline-flex h-10 w-10 items-center justify-center rounded-full bg-white/10"
           aria-label="Panier"
         >
@@ -36,7 +37,7 @@ export default function ShopHeader({ onMenuOpen, cartCount }: ShopHeaderProps) {
               {cartCount}
             </span>
           )}
-        </button>
+        </Link>
       </div>
 
       <div className="relative mt-4">

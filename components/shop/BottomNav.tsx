@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import {
   Grid2x2,
   Heart,
@@ -14,11 +15,11 @@ type BottomNavProps = {
 };
 
 const navItems = [
-  { key: "home", label: "Accueil", icon: Home },
-  { key: "categories", label: "Categories", icon: Grid2x2 },
-  { key: "promotions", label: "Promotions", icon: Percent },
-  { key: "favorites", label: "Favoris", icon: Heart },
-  { key: "cart", label: "Panier", icon: ShoppingBag },
+  { key: "home", label: "Accueil", icon: Home, href: "/" },
+  { key: "categories", label: "Categories", icon: Grid2x2, href: "/categories" },
+  { key: "promotions", label: "Promotions", icon: Percent, href: "/promotions" },
+  { key: "favorites", label: "Favoris", icon: Heart, href: "/favoris" },
+  { key: "cart", label: "Panier", icon: ShoppingBag, href: "/panier" },
 ] as const;
 
 export default function BottomNav({ active = "home", cartCount }: BottomNavProps) {
@@ -30,8 +31,8 @@ export default function BottomNav({ active = "home", cartCount }: BottomNavProps
           const isActive = item.key === active;
           return (
             <li key={item.key}>
-              <button
-                type="button"
+              <Link
+                href={item.href}
                 className={`relative flex w-full flex-col items-center justify-center rounded-xl py-2 text-[11px] transition ${isActive ? "text-[#97002f]" : "text-zinc-500 hover:text-zinc-700"}`}
               >
                 <Icon className={`mb-0.5 h-5 w-5 ${isActive ? "stroke-[2.3]" : ""}`} />
@@ -41,7 +42,7 @@ export default function BottomNav({ active = "home", cartCount }: BottomNavProps
                     {cartCount}
                   </span>
                 )}
-              </button>
+              </Link>
             </li>
           );
         })}

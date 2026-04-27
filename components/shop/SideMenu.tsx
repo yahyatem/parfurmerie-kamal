@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { Gift, X } from "lucide-react";
 
 type SideMenuProps = {
@@ -8,19 +9,19 @@ type SideMenuProps = {
 };
 
 const shopLinks = [
-  "Accueil",
-  "Categories",
-  "Promotions",
-  "Nouveautes",
-  "Les plus populaires",
+  { label: "Accueil", href: "/" },
+  { label: "Categories", href: "/categories" },
+  { label: "Promotions", href: "/promotions" },
+  { label: "Nouveautes", href: "/#nouveautes" },
+  { label: "Les plus populaires", href: "/#meilleures-ventes" },
 ];
 
 const infoLinks = [
-  "A propos de nous",
-  "Contactez-nous",
-  "Politique de confidentialite",
-  "Conditions d'utilisation",
-  "FAQ",
+  { label: "A propos de nous", href: "/about" },
+  { label: "Contactez-nous", href: "/contact" },
+  { label: "Politique de confidentialite", href: "/privacy" },
+  { label: "Conditions d'utilisation", href: "/terms" },
+  { label: "FAQ", href: "/faq" },
 ];
 
 export default function SideMenu({ open, onClose }: SideMenuProps) {
@@ -59,13 +60,14 @@ export default function SideMenu({ open, onClose }: SideMenuProps) {
             <h2 className="text-xs font-semibold uppercase tracking-wide text-zinc-400">Boutique</h2>
             <ul className="mt-3 space-y-1">
               {shopLinks.map((item) => (
-                <li key={item}>
-                  <button
-                    type="button"
+                <li key={item.label}>
+                  <Link
+                    href={item.href}
+                    onClick={onClose}
                     className="w-full rounded-lg px-3 py-2 text-left text-sm text-zinc-700 transition hover:bg-rose-50 hover:text-[#97002f]"
                   >
-                    {item}
-                  </button>
+                    {item.label}
+                  </Link>
                 </li>
               ))}
             </ul>
@@ -77,13 +79,14 @@ export default function SideMenu({ open, onClose }: SideMenuProps) {
             </h2>
             <ul className="mt-3 space-y-1">
               {infoLinks.map((item) => (
-                <li key={item}>
-                  <button
-                    type="button"
+                <li key={item.label}>
+                  <Link
+                    href={item.href}
+                    onClick={onClose}
                     className="w-full rounded-lg px-3 py-2 text-left text-sm text-zinc-700 transition hover:bg-rose-50 hover:text-[#97002f]"
                   >
-                    {item}
-                  </button>
+                    {item.label}
+                  </Link>
                 </li>
               ))}
             </ul>
