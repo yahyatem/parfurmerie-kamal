@@ -552,12 +552,17 @@ export default function ProduitsPage() {
       stock: Number(formStock || 0),
       status: formStatus,
     };
+    if (editingId && !editingProduct) {
+      setErrorMessage("Produit introuvable pour modification.");
+      setSavingProduct(false);
+      return;
+    }
 
     const result = editingId
       ? await supabase
           .from("products")
           .update(payload)
-          .eq("id", editingProduct.id)
+          .eq("id", editingProduct?.id ?? "")
           .select(
             "id, name, description, price, stock, status, image, main_image, brand_id, category_id, brands(name), categories(name)",
           )

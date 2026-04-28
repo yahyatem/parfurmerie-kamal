@@ -248,10 +248,10 @@ export default function DashboardPage() {
         </div>
       ) : (
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-          <StatCard title="Total Commandes" value={stats.totalOrders} trend="Commandes enregistrées" icon={ShoppingCart} colorClass="bg-sky-50 text-sky-600" />
+          <StatCard title="Total Commandes" value={String(stats.totalOrders)} trend="Commandes enregistrées" icon={ShoppingCart} colorClass="bg-sky-50 text-sky-600" />
           <StatCard title="Revenus" value={formatDh(stats.totalRevenue)} trend="Chiffre d'affaires total" icon={CircleDollarSign} colorClass="bg-rose-50 text-rose-600" />
-          <StatCard title="En attente" value={stats.pendingOrders} trend="Commandes en attente" icon={Clock3} colorClass="bg-amber-50 text-amber-600" />
-          <StatCard title="Livrées" value={stats.deliveredOrders} trend="Commandes livrées" icon={CircleCheckBig} colorClass="bg-emerald-50 text-emerald-600" />
+          <StatCard title="En attente" value={String(stats.pendingOrders)} trend="Commandes en attente" icon={Clock3} colorClass="bg-amber-50 text-amber-600" />
+          <StatCard title="Livrées" value={String(stats.deliveredOrders)} trend="Commandes livrées" icon={CircleCheckBig} colorClass="bg-emerald-50 text-emerald-600" />
         </div>
       )}
 
@@ -274,7 +274,9 @@ export default function DashboardPage() {
                 </defs>
                 <XAxis dataKey="date" tick={{ fontSize: 12, fill: "#71717a" }} axisLine={false} tickLine={false} />
                 <YAxis domain={[0, "auto"]} tickFormatter={(v) => `${Math.round(Number(v) / 1000)}K`} tick={{ fontSize: 12, fill: "#71717a" }} axisLine={false} tickLine={false} />
-                <Tooltip formatter={(v: number) => [`${v.toLocaleString("fr-FR")} DH`, "Ventes"]} />
+                <Tooltip
+                  formatter={(v) => [`${Number(v ?? 0).toLocaleString("fr-FR")} DH`, "Ventes"]}
+                />
                 <Area type="monotone" dataKey="value" stroke="#97002f" strokeWidth={3} fill="url(#salesFill)" />
               </AreaChart>
             </ResponsiveContainer>

@@ -34,10 +34,12 @@ export default function FavorisPage() {
             <ProductCard
               key={product.id}
               product={{
-                ...product,
+                id: product.id,
+                name: product.name,
+                image: product.image ?? "",
                 price: `${product.price} DH`,
                 brand: product.brand ?? "Marque",
-                category: "Produit",
+                category: (product as { category?: string }).category ?? "Produit",
                 description: product.description ?? "",
               }}
               showRemoveFavorite
