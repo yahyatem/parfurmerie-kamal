@@ -1,6 +1,7 @@
 "use client";
 
 import { Heart, ShoppingCart } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { useStore } from "@/store/useStore";
 
 export type ShopProduct = {
@@ -32,6 +33,7 @@ function isUuid(value: string) {
 }
 
 export default function ProductCard({ product, showRemoveFavorite = false }: ProductCardProps) {
+  const router = useRouter();
   const addToCart = useStore((state) => state.addToCart);
   const toggleFavorite = useStore((state) => state.toggleFavorite);
   const isFavorite = useStore((state) =>
@@ -50,7 +52,10 @@ export default function ProductCard({ product, showRemoveFavorite = false }: Pro
   const hasImageUrl = typeof product.image === "string" && product.image.startsWith("http");
 
   return (
-    <article className="rounded-2xl border border-gray-100 bg-white p-2.5 shadow-sm">
+    <article
+      className="cursor-pointer rounded-2xl border border-gray-100 bg-white p-2.5 shadow-sm"
+      onClick={() => router.push(`/produits/${product.id}`)}
+    >
       <div className="relative">
         <div className="aspect-[3/4] w-full overflow-hidden rounded-xl border border-rose-100 bg-rose-50/70">
           {hasImageUrl ? (
@@ -76,7 +81,10 @@ export default function ProductCard({ product, showRemoveFavorite = false }: Pro
         )}
         <button
           type="button"
-          onClick={() => toggleFavorite(mappedProduct)}
+          onClick={(event) => {
+            event.stopPropagation();
+            toggleFavorite(mappedProduct);
+          }}
           className={`absolute right-2 top-2 inline-flex h-8 w-8 items-center justify-center rounded-full shadow-sm ${
             isFavorite ? "bg-rose-50 text-red-500" : "bg-white/90 text-zinc-500"
           }`}
@@ -101,7 +109,8 @@ export default function ProductCard({ product, showRemoveFavorite = false }: Pro
         </div>
         <button
           type="button"
-          onClick={() => {
+          onClick={(event) => {
+            event.stopPropagation();
             if (canAddToCart) {
               addToCart(mappedProduct);
             }
@@ -115,7 +124,10 @@ export default function ProductCard({ product, showRemoveFavorite = false }: Pro
       {showRemoveFavorite && (
         <button
           type="button"
-          onClick={() => toggleFavorite(mappedProduct)}
+          onClick={(event) => {
+            event.stopPropagation();
+            toggleFavorite(mappedProduct);
+          }}
           className="mt-2 w-full rounded-lg border border-rose-100 px-2 py-1.5 text-xs font-medium text-[#97002f] transition hover:bg-rose-50"
         >
           Retirer des favoris

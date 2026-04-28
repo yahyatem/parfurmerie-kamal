@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Loader2, Package, Plus, Search, Upload } from "lucide-react";
+import { Loader2, Plus, Search, Trash2, Upload } from "lucide-react";
 import ActionButtons from "@/components/admin/ActionButtons";
 import Badge from "@/components/admin/Badge";
 import DataTable from "@/components/admin/DataTable";
@@ -10,6 +10,7 @@ import { supabase } from "@/lib/supabase";
 type Product = {
   id: string;
   image: string;
+  mainImage: string;
   name: string;
   description: string;
   category: string;
@@ -24,6 +25,7 @@ type Product = {
 type SupabaseProductRow = {
   id: string | number;
   image: string | null;
+  main_image: string | null;
   name: string | null;
   description: string | null;
   old_price: number | string | null;
@@ -42,6 +44,25 @@ type OptionRow = {
   name: string | null;
 };
 
+type ProductImageRow = {
+  id: string | number;
+  product_id: string | number;
+  url: string | null;
+  is_main: boolean | null;
+};
+
+type ExistingFormImage = {
+  id: string;
+  url: string;
+};
+
+type NewFormImage = {
+  tempId: string;
+  file: File;
+  previewUrl: string;
+  fileName: string;
+};
+
 function getRelationName(
   relation: { name: string | null } | { name: string | null }[] | null | undefined,
 ) {
@@ -58,6 +79,7 @@ const mockProducts: Product[] = [
     description: "Parfum floral intense",
     category: "Parfums",
     brand: "Bath & Body Works",
+    mainImage: "",
     categoryId: null,
     brandId: null,
     price: "190,00 DH",
@@ -71,6 +93,7 @@ const mockProducts: Product[] = [
     description: "Nettoyant corps & bain",
     category: "Corps & Bain",
     brand: "A-DERMA",
+    mainImage: "",
     categoryId: null,
     brandId: null,
     price: "139,00 DH",
@@ -84,6 +107,7 @@ const mockProducts: Product[] = [
     description: "Eau de parfum",
     category: "Parfums",
     brand: "Lancôme",
+    mainImage: "",
     categoryId: null,
     brandId: null,
     price: "850,00 DH",
@@ -97,6 +121,7 @@ const mockProducts: Product[] = [
     description: "Mascara volume",
     category: "Maquillage",
     brand: "Essence",
+    mainImage: "",
     categoryId: null,
     brandId: null,
     price: "59,00 DH",
@@ -110,6 +135,7 @@ const mockProducts: Product[] = [
     description: "Soin cheveux",
     category: "Capillaire",
     brand: "L'Oréal",
+    mainImage: "",
     categoryId: null,
     brandId: null,
     price: "89,00 DH",
@@ -123,6 +149,7 @@ const mockProducts: Product[] = [
     description: "Pack beauté complet",
     category: "Coffrets",
     brand: "Bath & Body Works",
+    mainImage: "",
     categoryId: null,
     brandId: null,
     price: "500,00 DH",
@@ -136,6 +163,7 @@ const mockProducts: Product[] = [
     description: "Crème visage",
     category: "Soins Visage",
     brand: "A-DERMA",
+    mainImage: "",
     categoryId: null,
     brandId: null,
     price: "165,00 DH",
@@ -155,20 +183,63 @@ function categoryBadgeClass(category: string) {
   return "bg-zinc-100 text-zinc-700";
 }
 
+function ProductImage({
+  image,
+  name,
+}: {
+  image: string;
+  name: string;
+}) {
+  const [hasError, setHasError] = useState(false);
+
+  return image && !hasError ? (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={image}
+      alt={name}
+      onError={() => setHasError(true)}
+      className="w-12 h-12 object-cover rounded"
+    />
+  ) : (
+    <div className="w-12 h-12 bg-gray-200 flex items-center justify-center rounded text-xs">IMG</div>
+  );
+}
+
+function FormThumbImage({ src, alt }: { src: string; alt: string }) {
+  const [hasError, setHasError] = useState(false);
+  const displayUrl = useMemo(() => {
+    if (!src) return "";
+    if (src.startsWith("http")) return src;
+    const { data } = supabase.storage.from("products").getPublicUrl(src);
+    return data.publicUrl;
+  }, [src]);
+
+  if (!displayUrl || hasError) {
+    return (
+      <div className="flex h-full w-full items-center justify-center rounded-md bg-gray-200 text-[10px] text-zinc-600">
+        IMG
+      </div>
+    );
+  }
+
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={displayUrl}
+      alt={alt}
+      onError={() => setHasError(true)}
+      className="h-20 w-full object-cover rounded-lg"
+    />
+  );
+}
+
 function ProductCard({ product }: { product: Product }) {
-  const hasImageUrl = product.image.startsWith("http");
+  const displayImage = product.mainImage || product.image;
   return (
     <article className="rounded-2xl border border-gray-100 bg-white p-4 shadow-md">
       <div className="flex items-start gap-3">
         <div className="inline-flex h-16 w-14 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-gray-100 text-gray-400">
-          {hasImageUrl ? (
-            <>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={product.image} alt={product.name} className="h-full w-full object-cover" />
-            </>
-          ) : (
-            <Package className="h-5 w-5" />
-          )}
+          <ProductImage image={displayImage} name={product.name} />
         </div>
         <div className="min-w-0 flex-1 space-y-1">
           <p className="line-clamp-2 text-base font-semibold text-zinc-900">{product.name}</p>
@@ -210,15 +281,29 @@ export default function ProduitsPage() {
   const [formPrice, setFormPrice] = useState("");
   const [formStock, setFormStock] = useState("");
   const [formStatus, setFormStatus] = useState<"active" | "inactive">("active");
-  const [imageUrl, setImageUrl] = useState("");
-  const [selectedImageFile, setSelectedImageFile] = useState<File | null>(null);
-  const [selectedImageName, setSelectedImageName] = useState("");
+  const [existingFormImages, setExistingFormImages] = useState<ExistingFormImage[]>([]);
+  const [newFormImages, setNewFormImages] = useState<NewFormImage[]>([]);
+  const [removedImageIds, setRemovedImageIds] = useState<string[]>([]);
+  const [selectedMainImageKey, setSelectedMainImageKey] = useState<string>("");
   const [uploadingImage, setUploadingImage] = useState(false);
   const [savingProduct, setSavingProduct] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [productsFetchError, setProductsFetchError] = useState("");
   const [brandsOptions, setBrandsOptions] = useState<{ id: string; name: string }[]>([]);
   const [categoriesOptions, setCategoriesOptions] = useState<{ id: string; name: string }[]>([]);
+
+  async function toPublicImageUrl(url: string | null | undefined) {
+    const raw = (url ?? "").trim();
+    if (!raw) return "";
+    if (raw.startsWith("http")) {
+      console.log("product image url:", raw);
+      return raw;
+    }
+    const { data } = supabase.storage.from("products").getPublicUrl(raw);
+    const publicUrl = data.publicUrl;
+    console.log("product image url:", publicUrl);
+    return publicUrl;
+  }
 
   useEffect(() => {
     let mounted = true;
@@ -228,7 +313,7 @@ export default function ProduitsPage() {
       const [productsResult, brandsResult, categoriesResult] = await Promise.all([
         supabase
           .from("products")
-          .select("id,name,description,price,old_price,image,stock,category_id,brand_id,created_at")
+          .select("id,name,description,price,old_price,image,main_image,stock,category_id,brand_id,created_at")
           .order("created_at", { ascending: false }),
         supabase.from("brands").select("id, name"),
         supabase.from("categories").select("id, name"),
@@ -276,9 +361,14 @@ export default function ProduitsPage() {
       const brandsById = new Map(mappedBrands.map((item) => [item.id, item.name]));
       const categoriesById = new Map(mappedCategories.map((item) => [item.id, item.name]));
 
-      const mapped = (data as SupabaseProductRow[]).map((item) => ({
+      const mapped: Product[] = [];
+      for (const item of data as SupabaseProductRow[]) {
+        const mainImageUrl = await toPublicImageUrl(item.main_image);
+        const imageUrl = await toPublicImageUrl(item.image);
+        mapped.push({
           id: String(item.id),
-          image: item.image ?? "",
+          image: imageUrl || mainImageUrl,
+          mainImage: mainImageUrl,
           name: item.name ?? "Produit",
           description: item.description ?? "",
           category: item.category_id
@@ -290,7 +380,8 @@ export default function ProduitsPage() {
           price: `${item.price ?? 0} DH`,
           stock: Number(item.stock ?? 0),
           status: item.status === "inactive" ? "inactive" : "active",
-        })) as Product[];
+        });
+      }
 
       setProducts(mapped);
     }
@@ -324,15 +415,83 @@ export default function ProduitsPage() {
   const brands = Array.from(new Set(products.map((p) => p.brand)));
 
   function handleImageSelect(event: React.ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0];
-    if (!file) return;
+    const files = Array.from(event.target.files ?? []);
+    if (files.length === 0) return;
     setErrorMessage("");
-    setSelectedImageFile(file);
-    setSelectedImageName(file.name);
-    setImageUrl(URL.createObjectURL(file));
+    setNewFormImages((prev) => {
+      const mapped = files.map((file) => ({
+        tempId: crypto.randomUUID(),
+        file,
+        previewUrl: URL.createObjectURL(file),
+        fileName: file.name,
+      }));
+      const next = [...prev, ...mapped];
+      if (!selectedMainImageKey && next[0]) {
+        setSelectedMainImageKey(`new:${next[0].tempId}`);
+      }
+      return next;
+    });
+    event.target.value = "";
   }
 
-  function handleEdit(product: Product) {
+  async function loadProductImages(productId: string, fallbackImage: string) {
+    const { data, error } = await supabase
+      .from("product_images")
+      .select("id, product_id, url, is_main")
+      .eq("product_id", productId)
+      .order("id", { ascending: true });
+
+    if (error) {
+      console.error("Failed to fetch product images:", error);
+      setExistingFormImages(
+        fallbackImage ? [{ id: `fallback:${productId}`, url: fallbackImage }] : [],
+      );
+      setSelectedMainImageKey(fallbackImage ? `existing:fallback:${productId}` : "");
+      return;
+    }
+
+    const existingImages = ((data ?? []) as ProductImageRow[])
+      .filter((item) => Boolean(item.url))
+      .map((item) => ({
+        id: String(item.id),
+        url: item.url ?? "",
+        isMain: Boolean(item.is_main),
+      }));
+    console.log("existing product images:", existingImages);
+
+    if (existingImages.length === 0 && fallbackImage) {
+      setExistingFormImages([{ id: `fallback:${productId}`, url: fallbackImage }]);
+      setSelectedMainImageKey(`existing:fallback:${productId}`);
+      return;
+    }
+
+    setExistingFormImages(existingImages.map((item) => ({ id: item.id, url: item.url })));
+    const main = existingImages.find((item) => item.isMain) ?? existingImages[0];
+    setSelectedMainImageKey(main ? `existing:${main.id}` : "");
+  }
+
+  function handleRemoveExistingImage(imageId: string) {
+    setExistingFormImages((prev) => prev.filter((img) => img.id !== imageId));
+    if (!imageId.startsWith("fallback:")) {
+      setRemovedImageIds((prev) => (prev.includes(imageId) ? prev : [...prev, imageId]));
+    }
+    if (selectedMainImageKey === `existing:${imageId}`) {
+      setSelectedMainImageKey("");
+    }
+  }
+
+  function handleRemoveNewImage(tempId: string) {
+    setNewFormImages((prev) => {
+      const imageToRemove = prev.find((img) => img.tempId === tempId);
+      if (imageToRemove) URL.revokeObjectURL(imageToRemove.previewUrl);
+      return prev.filter((img) => img.tempId !== tempId);
+    });
+    if (selectedMainImageKey === `new:${tempId}`) {
+      setSelectedMainImageKey("");
+    }
+  }
+
+  async function handleEdit(product: Product) {
     setEditingProduct(product);
     setIsFormOpen(true);
     setFormName(product.name);
@@ -342,10 +501,12 @@ export default function ProduitsPage() {
     setFormPrice(product.price.replace(" DH", ""));
     setFormStock(String(product.stock));
     setFormStatus(product.status);
-    setImageUrl(product.image);
-    setSelectedImageFile(null);
-    setSelectedImageName("");
+    setExistingFormImages([]);
+    setNewFormImages([]);
+    setRemovedImageIds([]);
+    setSelectedMainImageKey("");
     setErrorMessage("");
+    await loadProductImages(product.id, product.mainImage || product.image);
   }
 
   function resetForm() {
@@ -357,9 +518,10 @@ export default function ProduitsPage() {
     setFormPrice("");
     setFormStock("");
     setFormStatus("active");
-    setImageUrl("");
-    setSelectedImageFile(null);
-    setSelectedImageName("");
+    setExistingFormImages([]);
+    setNewFormImages([]);
+    setRemovedImageIds([]);
+    setSelectedMainImageKey("");
     setErrorMessage("");
   }
 
@@ -381,29 +543,6 @@ export default function ProduitsPage() {
     const selectedBrand = brandsOptions.find((item) => item.id === formBrandId)?.name ?? "Sans marque";
     const selectedCategory =
       categoriesOptions.find((item) => item.id === formCategoryId)?.name ?? "Sans catégorie";
-    let finalImageUrl: string | null = imageUrl || null;
-
-    if (selectedImageFile) {
-      setUploadingImage(true);
-      const safeName = selectedImageFile.name.replace(/\s+/g, "-");
-      const filePath = `products/${Date.now()}-${safeName}`;
-      const { error: uploadError } = await supabase.storage
-        .from("products")
-        .upload(filePath, selectedImageFile, { upsert: true });
-
-      if (uploadError) {
-        setErrorMessage(`Erreur upload image: ${uploadError.message}`);
-        setSavingProduct(false);
-        setUploadingImage(false);
-        return;
-      }
-
-      const { data } = supabase.storage.from("products").getPublicUrl(filePath);
-      finalImageUrl = data.publicUrl;
-    } else if (!editingId) {
-      finalImageUrl = null;
-    }
-
     const payload = {
       name: formName.trim(),
       description: formDescription.trim(),
@@ -412,7 +551,6 @@ export default function ProduitsPage() {
       price: Number(formPrice || 0),
       stock: Number(formStock || 0),
       status: formStatus,
-      image: finalImageUrl,
     };
 
     const result = editingId
@@ -420,12 +558,16 @@ export default function ProduitsPage() {
           .from("products")
           .update(payload)
           .eq("id", editingProduct.id)
-          .select("id, name, description, price, stock, status, image, brand_id, category_id, brands(name), categories(name)")
+          .select(
+            "id, name, description, price, stock, status, image, main_image, brand_id, category_id, brands(name), categories(name)",
+          )
           .single()
       : await supabase
           .from("products")
           .insert(payload)
-          .select("id, name, description, price, stock, status, image, brand_id, category_id, brands(name), categories(name)")
+          .select(
+            "id, name, description, price, stock, status, image, main_image, brand_id, category_id, brands(name), categories(name)",
+          )
           .single();
 
     if (result.error || !result.data) {
@@ -434,10 +576,156 @@ export default function ProduitsPage() {
       return;
     }
 
-    const row = result.data as SupabaseProductRow;
+    const productId = String((result.data as SupabaseProductRow).id);
+
+    if (editingId && removedImageIds.length > 0) {
+      const { error: removeError } = await supabase
+        .from("product_images")
+        .delete()
+        .eq("product_id", productId)
+        .in("id", removedImageIds);
+
+      if (removeError) {
+        setErrorMessage(`Erreur suppression image: ${removeError.message}`);
+        setSavingProduct(false);
+        return;
+      }
+    }
+
+    setUploadingImage(true);
+    const uploadedNewImages: { tempId: string; url: string }[] = [];
+    for (const item of newFormImages) {
+      const safeName = item.file.name.replace(/\s+/g, "-");
+      const filePath = `${Date.now()}-${safeName}`;
+      const { error: uploadError } = await supabase.storage.from("products").upload(filePath, item.file, {
+        upsert: true,
+      });
+      if (uploadError) {
+        setUploadingImage(false);
+        setSavingProduct(false);
+        setErrorMessage(`Erreur upload image: ${uploadError.message}`);
+        return;
+      }
+      const { data } = supabase.storage.from("products").getPublicUrl(filePath);
+      const fullPublicUrl = data.publicUrl;
+      console.log("Uploaded public URL:", fullPublicUrl);
+      uploadedNewImages.push({ tempId: item.tempId, url: fullPublicUrl });
+    }
+
+    const insertedImageRows =
+      uploadedNewImages.length > 0
+        ? await supabase
+            .from("product_images")
+            .insert(
+              uploadedNewImages.map((item) => ({
+                product_id: productId,
+                url: item.url,
+                is_main: false,
+              })),
+            )
+            .select("id, product_id, url, is_main")
+        : null;
+
+    if (insertedImageRows?.error) {
+      setUploadingImage(false);
+      setSavingProduct(false);
+      setErrorMessage(`Erreur enregistrement images: ${insertedImageRows.error.message}`);
+      return;
+    }
+
+    const insertedImages = ((insertedImageRows?.data ?? []) as ProductImageRow[]).map((item, index) => ({
+      id: String(item.id),
+      url: item.url ?? uploadedNewImages[index]?.url ?? "",
+      tempId: uploadedNewImages[index]?.tempId ?? "",
+    }));
+
+    const remainingExisting = existingFormImages.filter(
+      (item) => !removedImageIds.includes(item.id) || item.id.startsWith("fallback:"),
+    );
+
+    let finalMainImageId = "";
+    let finalMainImageUrl: string | null = null;
+    if (selectedMainImageKey.startsWith("existing:")) {
+      const targetId = selectedMainImageKey.replace("existing:", "");
+      const target = remainingExisting.find((item) => item.id === targetId);
+      if (target && !target.id.startsWith("fallback:")) {
+        finalMainImageId = target.id;
+      }
+      finalMainImageUrl = target?.url ?? null;
+    } else if (selectedMainImageKey.startsWith("new:")) {
+      const targetTempId = selectedMainImageKey.replace("new:", "");
+      const target = insertedImages.find((item) => item.tempId === targetTempId);
+      finalMainImageId = target?.id ?? "";
+      finalMainImageUrl = target?.url ?? null;
+    }
+
+    if (!finalMainImageUrl) {
+      const firstInserted = insertedImages[0];
+      const firstExisting = remainingExisting.find((item) => !item.id.startsWith("fallback:"));
+      if (firstInserted) {
+        finalMainImageId = firstInserted.id;
+        finalMainImageUrl = firstInserted.url;
+      } else if (firstExisting) {
+        finalMainImageId = firstExisting.id;
+        finalMainImageUrl = firstExisting.url;
+      } else {
+        finalMainImageId = "";
+        finalMainImageUrl = null;
+      }
+    }
+
+    const { error: resetMainError } = await supabase
+      .from("product_images")
+      .update({ is_main: false })
+      .eq("product_id", productId);
+
+    if (resetMainError) {
+      setUploadingImage(false);
+      setSavingProduct(false);
+      setErrorMessage(`Erreur mise a jour image principale: ${resetMainError.message}`);
+      return;
+    }
+
+    if (finalMainImageId) {
+      const { error: setMainError } = await supabase
+        .from("product_images")
+        .update({ is_main: true })
+        .eq("product_id", productId)
+        .eq("id", finalMainImageId);
+      if (setMainError) {
+        setUploadingImage(false);
+        setSavingProduct(false);
+        setErrorMessage(`Erreur image principale: ${setMainError.message}`);
+        return;
+      }
+    }
+
+    const normalizedMainImageUrl = await toPublicImageUrl(finalMainImageUrl);
+
+    const { data: finalProductData, error: finalProductError } = await supabase
+      .from("products")
+      .update({
+        image: normalizedMainImageUrl || null,
+        main_image: normalizedMainImageUrl || null,
+      })
+      .eq("id", productId)
+      .select(
+        "id, name, description, price, stock, status, image, main_image, brand_id, category_id, brands(name), categories(name)",
+      )
+      .single();
+
+    if (finalProductError || !finalProductData) {
+      setUploadingImage(false);
+      setSavingProduct(false);
+      setErrorMessage(finalProductError?.message ?? "Impossible de finaliser le produit.");
+      return;
+    }
+
+    const row = finalProductData as SupabaseProductRow;
     const updatedProduct: Product = {
       id: String(row.id),
-      image: row.image ?? "",
+      image: row.image ? await toPublicImageUrl(row.image) : "",
+      mainImage: row.main_image ? await toPublicImageUrl(row.main_image) : "",
       name: row.name ?? "Produit",
       description: row.description ?? "",
       category: getRelationName(row.categories) ?? selectedCategory,
@@ -467,6 +755,115 @@ export default function ProduitsPage() {
   }
 
   const editingId = editingProduct?.id ?? null;
+  const hasAnyFormImages = existingFormImages.length + newFormImages.length > 0;
+
+  const renderImagesField = (inputId: string) => (
+    <div className="space-y-3">
+      <label className="block">
+        <span className="mb-1.5 block text-sm font-medium text-zinc-700">Images du produit</span>
+        <input
+          id={inputId}
+          type="file"
+          accept="image/*"
+          multiple
+          onChange={handleImageSelect}
+          className="sr-only"
+        />
+        <label
+          htmlFor={inputId}
+          className="flex h-24 w-full cursor-pointer flex-col items-center justify-center rounded-lg border border-dashed border-zinc-300 bg-zinc-50 text-center transition hover:bg-zinc-100"
+        >
+          <Upload className="mb-2 h-5 w-5 text-zinc-500" />
+          <p className="text-xs text-zinc-500">Cliquez pour choisir plusieurs images</p>
+        </label>
+      </label>
+
+      {hasAnyFormImages ? (
+        <div className="grid grid-cols-3 gap-2">
+          {existingFormImages.map((item) => {
+            const isMain = selectedMainImageKey === `existing:${item.id}`;
+            return (
+              <div key={`existing-${item.id}`} className="rounded-lg border border-zinc-200 p-2">
+                <div className="relative h-16 w-full overflow-hidden rounded-md bg-zinc-100">
+                  <FormThumbImage src={item.url} alt="Produit existant" />
+                </div>
+                <div className="mt-1.5 space-y-1">
+                  {isMain ? (
+                    <span className="inline-flex rounded-md bg-[#8b0637]/10 px-2 py-0.5 text-[10px] font-semibold text-[#8b0637]">
+                      Principale
+                    </span>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setSelectedMainImageKey(`existing:${item.id}`)}
+                      className="text-[10px] font-medium text-[#8b0637] hover:underline"
+                    >
+                      Definir principale
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveExistingImage(item.id)}
+                    className="inline-flex items-center gap-1 text-[10px] text-red-600 hover:underline"
+                  >
+                    <Trash2 className="h-3 w-3" />
+                    Supprimer
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+
+          {newFormImages.map((item) => {
+            const isMain = selectedMainImageKey === `new:${item.tempId}`;
+            return (
+              <div key={`new-${item.tempId}`} className="rounded-lg border border-zinc-200 p-2">
+                <div className="relative h-16 w-full overflow-hidden rounded-md bg-zinc-100">
+                  <FormThumbImage src={item.previewUrl} alt={item.fileName} />
+                </div>
+                <p className="mt-1 line-clamp-1 text-[10px] text-zinc-500">{item.fileName}</p>
+                <div className="mt-1 space-y-1">
+                  {isMain ? (
+                    <span className="inline-flex rounded-md bg-[#8b0637]/10 px-2 py-0.5 text-[10px] font-semibold text-[#8b0637]">
+                      Principale
+                    </span>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setSelectedMainImageKey(`new:${item.tempId}`)}
+                      className="text-[10px] font-medium text-[#8b0637] hover:underline"
+                    >
+                      Definir principale
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveNewImage(item.tempId)}
+                    className="inline-flex items-center gap-1 text-[10px] text-red-600 hover:underline"
+                  >
+                    <Trash2 className="h-3 w-3" />
+                    Supprimer
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      ) : (
+        <div className="flex h-24 w-full flex-col items-center justify-center rounded-lg border border-dashed border-zinc-300 bg-zinc-50 text-center">
+          <Upload className="mb-2 h-5 w-5 text-zinc-500" />
+          <p className="text-xs text-zinc-500">Aucune image sélectionnée</p>
+        </div>
+      )}
+
+      {uploadingImage ? (
+        <p className="inline-flex items-center gap-2 text-xs text-zinc-500">
+          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+          Upload en cours lors de l&apos;enregistrement...
+        </p>
+      ) : null}
+    </div>
+  );
 
   return (
     <section className="grid max-w-full gap-6 overflow-hidden 2xl:grid-cols-[2.1fr,1fr]">
@@ -571,14 +968,7 @@ export default function ProduitsPage() {
                   header: "Image",
                   render: (item) => (
                     <span className="inline-flex h-10 w-10 items-center justify-center overflow-hidden rounded-lg bg-zinc-100 text-xs font-semibold text-zinc-700">
-                      {item.image?.startsWith("http") ? (
-                        <>
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img src={item.image} alt={item.name} className="h-full w-full object-cover" />
-                        </>
-                      ) : (
-                        "IMG"
-                      )}
+                      <ProductImage image={item.mainImage || item.image} name={item.name} />
                     </span>
                   ),
                 },
@@ -756,49 +1146,7 @@ export default function ProduitsPage() {
                 />
               </label>
 
-              <label className="block">
-                <span className="mb-1.5 block text-sm font-medium text-zinc-700">Image du produit</span>
-                <input
-                  id="desktop-product-image-input"
-                  type="file"
-                  accept="image/*"
-                  onChange={handleImageSelect}
-                  className="sr-only"
-                />
-                <label
-                  htmlFor="desktop-product-image-input"
-                  className="flex h-24 w-full cursor-pointer flex-col items-center justify-center rounded-lg border border-dashed border-zinc-300 bg-zinc-50 text-center transition hover:bg-zinc-100"
-                >
-                  <Upload className="mb-2 h-5 w-5 text-zinc-500" />
-                  <p className="text-xs text-zinc-500">Cliquez pour choisir une image</p>
-                </label>
-                {selectedImageName ? (
-                  <p className="mt-2 text-xs text-zinc-600">Fichier: {selectedImageName}</p>
-                ) : null}
-                {uploadingImage ? (
-                  <p className="mt-2 inline-flex items-center gap-2 text-xs text-zinc-500">
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                    Upload en cours lors de l&apos;enregistrement...
-                  </p>
-                ) : null}
-              </label>
-
-              {imageUrl ? (
-                <div>
-                  <p className="mb-1.5 text-sm font-medium text-zinc-700">
-                    {editingId ? "Image actuelle" : "Aperçu image"}
-                  </p>
-                  <div className="h-28 w-24 overflow-hidden rounded-lg border border-zinc-200 bg-zinc-100">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={imageUrl} alt="Aperçu produit" className="h-full w-full object-cover" />
-                  </div>
-                </div>
-              ) : (
-                <div className="flex h-24 w-full flex-col items-center justify-center rounded-lg border border-dashed border-zinc-300 bg-zinc-50 text-center">
-                  <Upload className="mb-2 h-5 w-5 text-zinc-500" />
-                  <p className="text-xs text-zinc-500">Aucune image sélectionnée</p>
-                </div>
-              )}
+              {renderImagesField("desktop-product-image-input")}
 
               <label className="block">
                 <span className="mb-1.5 block text-sm font-medium text-zinc-700">Statut *</span>
@@ -946,49 +1294,7 @@ export default function ProduitsPage() {
                   />
                 </label>
 
-                <label className="block">
-                  <span className="mb-1.5 block text-sm font-medium text-zinc-700">Image du produit</span>
-                  <input
-                    id="mobile-product-image-input"
-                    type="file"
-                    accept="image/*"
-                    onChange={handleImageSelect}
-                    className="sr-only"
-                  />
-                  <label
-                    htmlFor="mobile-product-image-input"
-                    className="flex h-24 w-full cursor-pointer flex-col items-center justify-center rounded-lg border border-dashed border-zinc-300 bg-zinc-50 text-center transition hover:bg-zinc-100"
-                  >
-                    <Upload className="mb-2 h-5 w-5 text-zinc-500" />
-                    <p className="text-xs text-zinc-500">Cliquez pour choisir une image</p>
-                  </label>
-                  {selectedImageName ? (
-                    <p className="mt-2 text-xs text-zinc-600">Fichier: {selectedImageName}</p>
-                  ) : null}
-                  {uploadingImage ? (
-                    <p className="mt-2 inline-flex items-center gap-2 text-xs text-zinc-500">
-                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                      Upload en cours lors de l&apos;enregistrement...
-                    </p>
-                  ) : null}
-                </label>
-
-                {imageUrl ? (
-                  <div>
-                    <p className="mb-1.5 text-sm font-medium text-zinc-700">
-                      {editingId ? "Image actuelle" : "Aperçu image"}
-                    </p>
-                    <div className="h-28 w-24 overflow-hidden rounded-lg border border-zinc-200 bg-zinc-100">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={imageUrl} alt="Aperçu produit" className="h-full w-full object-cover" />
-                    </div>
-                  </div>
-                ) : (
-                  <div className="flex h-24 w-full flex-col items-center justify-center rounded-lg border border-dashed border-zinc-300 bg-zinc-50 text-center">
-                    <Upload className="mb-2 h-5 w-5 text-zinc-500" />
-                    <p className="text-xs text-zinc-500">Aucune image sélectionnée</p>
-                  </div>
-                )}
+                {renderImagesField("mobile-product-image-input")}
 
                 <label className="block">
                   <span className="mb-1.5 block text-sm font-medium text-zinc-700">Statut *</span>

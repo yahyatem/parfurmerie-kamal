@@ -31,7 +31,17 @@ export default function FavorisPage() {
       {hasFavorites ? (
         <section className="grid grid-cols-2 gap-3">
           {favoriteProducts.map((product) => (
-            <ProductCard key={product.id} product={{ ...product, price: `${product.price} DH` }} showRemoveFavorite />
+            <ProductCard
+              key={product.id}
+              product={{
+                ...product,
+                price: `${product.price} DH`,
+                brand: product.brand ?? "Marque",
+                category: "Produit",
+                description: product.description ?? "",
+              }}
+              showRemoveFavorite
+            />
           ))}
         </section>
       ) : (

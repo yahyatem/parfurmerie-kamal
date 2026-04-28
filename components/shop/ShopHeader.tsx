@@ -2,13 +2,16 @@
 
 import Link from "next/link";
 import { Menu, Search, ShoppingCart, SlidersHorizontal } from "lucide-react";
+import { useStore } from "@/store/useStore";
 
 type ShopHeaderProps = {
   onMenuOpen: () => void;
-  cartCount: number;
+  cartCount?: number;
 };
 
-export default function ShopHeader({ onMenuOpen, cartCount }: ShopHeaderProps) {
+export default function ShopHeader({ onMenuOpen }: ShopHeaderProps) {
+  const totalItems = useStore((state) => state.totalItems);
+
   return (
     <header className="sticky top-0 z-30 bg-[#97002f] px-4 pb-4 pt-4 text-white shadow-sm">
       <div className="flex items-center justify-between">
@@ -32,9 +35,9 @@ export default function ShopHeader({ onMenuOpen, cartCount }: ShopHeaderProps) {
           aria-label="Panier"
         >
           <ShoppingCart className="h-5 w-5" />
-          {cartCount > 0 && (
+          {totalItems > 0 && (
             <span className="absolute right-0.5 top-0.5 inline-flex min-w-5 items-center justify-center rounded-full bg-red-500 px-1.5 text-[10px] font-semibold text-white">
-              {cartCount}
+              {totalItems}
             </span>
           )}
         </Link>
