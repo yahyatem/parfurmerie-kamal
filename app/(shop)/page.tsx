@@ -1,17 +1,8 @@
 import Link from "next/link";
 import { ShieldCheck, Truck, WalletCards, Headset } from "lucide-react";
-import CategoryCircle from "@/components/shop/CategoryCircle";
+import HomeOffersSlider, { type HomeOffer } from "@/components/shop/HomeOffersSlider";
 import ProductCard, { type ShopProduct } from "@/components/shop/ProductCard";
 import { supabase } from "@/lib/supabase";
-
-const categories = [
-  { label: "Parfums", emoji: "Perf" },
-  { label: "Soins visage", emoji: "Skin" },
-  { label: "Maquillage", emoji: "Make" },
-  { label: "Soins corps", emoji: "Body" },
-  { label: "Cheveux", emoji: "Hair" },
-  { label: "Accessoires", emoji: "Bag" },
-];
 
 const benefits = [
   { icon: ShieldCheck, label: "Produits 100% originaux" },
@@ -32,9 +23,52 @@ type DbProduct = {
   brand_id: string | number | null;
 };
 
+type DbOffer = {
+  id: string;
+  title: string | null;
+  subtitle: string | null;
+  description: string | null;
+  button_text: string | null;
+  image: string | null;
+  link: string | null;
+  is_active: boolean | null;
+  sort_order: number | null;
+};
+
+type DbCategory = {
+  id: string | number;
+  name: string | null;
+  image: string | null;
+  status: string | null;
+};
+
+type HomeCategory = {
+  id: string;
+  label: string;
+  imageUrl: string;
+};
+
 function formatPrice(value: number | string | null) {
   if (value === null || value === undefined || value === "") return "0 DH";
   return `${value} DH`;
+}
+
+function initialsFromName(name: string) {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return "CT";
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
+}
+
+function resolveOfferImageUrl(rawImage: string | null) {
+  const raw = (rawImage ?? "").trim();
+  if (!raw) return "";
+  if (raw.startsWith("https://")) return raw;
+  const normalizedPath = raw.replace(/^\/+/, "");
+  if (!normalizedPath) return "";
+  const publicUrl = supabase.storage.from("offers").getPublicUrl(normalizedPath).data.publicUrl;
+  if (publicUrl.startsWith("https://")) return publicUrl;
+  return "";
 }
 
 function ErrorCard() {
@@ -54,9 +88,35 @@ function EmptyCard() {
 }
 
 export default async function ShopHomePage() {
-  const { data, error } = await supabase.from("products").select(
-    "id, name, description, price, old_price, image, stock, category_id, brand_id",
-  );
+  const [productsResult, offersResult, categoriesResult] = await Promise.all([
+    supabase
+      .from("products")
+      .select("id, name, description, price, old_price, image, stock, category_id, brand_id"),
+    supabase
+      .from("offers")
+      .select("id, title, subtitle, description, button_text, image, link, is_active, sort_order")
+      .eq("is_active", true)
+      .order("sort_order", { ascending: true })
+      .order("created_at", { ascending: false }),
+    supabase.from("categories").select("id, name, image, status").order("created_at", { ascending: false }),
+  ]);
+  const { data, error } = productsResult;
+  const offersData = (offersResult.data ?? []) as DbOffer[];
+  const categoriesData = (categoriesResult.data ?? []) as DbCategory[];
+
+  if (offersResult.error) {
+    console.log("offers fetch error:", offersResult.error);
+  }
+  if (categoriesResult.error) {
+    console.log("categories fetch error:", categoriesResult.error);
+  }
+
+  const firstProductImageByCategory = new Map<string, string>();
+  ((data ?? []) as DbProduct[]).forEach((item) => {
+    const categoryId = item.category_id ? String(item.category_id) : "";
+    if (!categoryId || firstProductImageByCategory.has(categoryId)) return;
+    if (item.image) firstProductImageByCategory.set(categoryId, item.image);
+  });
 
   const products: ShopProduct[] = ((data ?? []) as DbProduct[]).map((item) => ({
     id: String(item.id),
@@ -69,33 +129,41 @@ export default async function ShopHomePage() {
     category: "Produit",
   }));
 
+  const offers: HomeOffer[] = offersData.map((offer) => {
+    const resolvedImage = resolveOfferImageUrl(offer.image);
+    console.log("offer image debug:", {
+      offerId: offer.id,
+      rawImage: offer.image,
+      resolvedImage,
+    });
+    return {
+      id: offer.id,
+      title: offer.title ?? "Offre exclusive",
+      subtitle: offer.subtitle ?? "Offres speciales",
+      description: offer.description ?? "",
+      buttonText: offer.button_text ?? "Decouvrir",
+      image: resolvedImage,
+      link: offer.link ?? "/promotions",
+    };
+  });
+  const homeCategories: HomeCategory[] = categoriesData
+    .filter((category) => category.status !== "inactive")
+    .slice(0, 8)
+    .map((category) => {
+      const categoryId = String(category.id);
+      return {
+        id: categoryId,
+        label: category.name ?? "Categorie",
+        imageUrl: category.image || firstProductImageByCategory.get(categoryId) || "",
+      };
+    });
+
   const bestSellers = products.slice(0, 4);
   const newProducts = products.slice(4, 8);
 
   return (
     <div className="space-y-5">
-      <section className="rounded-3xl bg-gradient-to-r from-[#97002f] to-[#b0134d] p-4 text-white shadow-md">
-        <div className="flex items-center gap-3">
-          <div className="flex-1">
-            <p className="text-sm text-rose-100">Offres speciales</p>
-            <p className="mt-1 text-3xl font-bold leading-tight">Jusqu&apos;a -40%</p>
-            <Link
-              href="/promotions"
-              className="mt-3 inline-flex rounded-xl bg-white px-4 py-2 text-sm font-semibold text-[#97002f]"
-            >
-              Decouvrir
-            </Link>
-          </div>
-          <div className="flex h-28 w-24 shrink-0 items-center justify-center rounded-2xl border border-white/30 bg-white/15 text-2xl">
-            Perf
-          </div>
-        </div>
-        <div className="mt-4 flex justify-center gap-1.5">
-          <span className="h-1.5 w-5 rounded-full bg-white" />
-          <span className="h-1.5 w-1.5 rounded-full bg-white/50" />
-          <span className="h-1.5 w-1.5 rounded-full bg-white/50" />
-        </div>
-      </section>
+      <HomeOffersSlider offers={offers} />
 
       <section className="rounded-2xl border border-rose-100 bg-rose-50/40 p-3">
         <ul className="space-y-2.5">
@@ -121,8 +189,18 @@ export default async function ShopHomePage() {
           </Link>
         </div>
         <div className="-mx-1 flex gap-3 overflow-x-auto px-1 pb-1">
-          {categories.map((category) => (
-            <CategoryCircle key={category.label} label={category.label} emoji={category.emoji} />
+          {homeCategories.map((category) => (
+            <button key={category.id} type="button" className="flex w-[84px] shrink-0 flex-col items-center gap-2">
+              <span className="inline-flex h-16 w-16 items-center justify-center overflow-hidden rounded-full border border-rose-100 bg-rose-50 text-lg font-semibold text-[#97002f] shadow-sm">
+                {category.imageUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={category.imageUrl} alt={category.label} className="h-full w-full object-cover" />
+                ) : (
+                  initialsFromName(category.label)
+                )}
+              </span>
+              <span className="line-clamp-2 text-center text-xs font-medium text-zinc-700">{category.label}</span>
+            </button>
           ))}
         </div>
       </section>

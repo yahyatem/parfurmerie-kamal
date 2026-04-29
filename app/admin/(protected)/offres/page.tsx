@@ -7,54 +7,71 @@ import Badge from "@/components/admin/Badge";
 import DataTable from "@/components/admin/DataTable";
 import { supabase } from "@/lib/supabase";
 
-type Category = {
+type Offer = {
   id: string;
-  image: string;
-  name: string;
+  title: string;
+  subtitle: string;
   description: string;
-  productsCount: number;
-  status: "active" | "inactive";
+  buttonText: string;
+  image: string;
+  link: string;
+  sortOrder: number;
+  isActive: boolean;
 };
 
-type DbCategory = {
-  id: string | number;
-  name: string | null;
+type DbOfferRow = {
+  id: string;
+  title: string | null;
+  subtitle: string | null;
   description: string | null;
+  button_text: string | null;
   image: string | null;
-  status: string | null;
+  link: string | null;
+  is_active: boolean | null;
+  sort_order: number | null;
 };
 
-type DbProductCategory = {
-  category_id: string | number | null;
-};
+const ITEMS_PER_PAGE = 8;
 
-const ITEMS_PER_PAGE = 6;
+// SQL reference (run manually in Supabase SQL editor, do not run in app):
+// create table if not exists public.offers (
+//   id uuid primary key default gen_random_uuid(),
+//   title text not null,
+//   subtitle text,
+//   description text,
+//   button_text text,
+//   image text,
+//   link text,
+//   is_active boolean not null default true,
+//   sort_order int not null default 0,
+//   created_at timestamp with time zone not null default now()
+// );
+// alter table public.offers enable row level security;
 
-function initialsFromName(name: string) {
-  const parts = name.trim().split(/\s+/).filter(Boolean);
-  if (parts.length === 0) return "CT";
-  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
-  return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
-}
-
-function CategoryImage({ image, name }: { image: string; name: string }) {
+function OfferImage({ image, title }: { image: string; title: string }) {
   const [hasError, setHasError] = useState(false);
-  if (image && !hasError) {
+
+  if (!image || hasError) {
     return (
-      // eslint-disable-next-line @next/next/no-img-element
-      <img src={image} alt={name} onError={() => setHasError(true)} className="h-full w-full object-cover" />
+      <div className="flex h-12 w-12 items-center justify-center rounded bg-zinc-100 text-[10px] text-zinc-500">
+        OFFRE
+      </div>
     );
   }
 
   return (
-    <div className="flex h-full w-full items-center justify-center text-xs font-semibold text-[#8b0637]">
-      {initialsFromName(name)}
-    </div>
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={image}
+      alt={title}
+      onError={() => setHasError(true)}
+      className="h-12 w-12 rounded object-cover"
+    />
   );
 }
 
-export default function CategoriesPage() {
-  const [categories, setCategories] = useState<Category[]>([]);
+export default function OffresPage() {
+  const [offers, setOffers] = useState<Offer[]>([]);
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
   const [saving, setSaving] = useState(false);
@@ -63,78 +80,64 @@ export default function CategoriesPage() {
   const [status, setStatus] = useState("all");
   const [page, setPage] = useState(1);
   const [isFormOpen, setIsFormOpen] = useState(false);
-  const [editingCategory, setEditingCategory] = useState<Category | null>(null);
+  const [editingOffer, setEditingOffer] = useState<Offer | null>(null);
 
-  const [formName, setFormName] = useState("");
+  const [formTitle, setFormTitle] = useState("");
+  const [formSubtitle, setFormSubtitle] = useState("");
   const [formDescription, setFormDescription] = useState("");
-  const [formStatus, setFormStatus] = useState<"active" | "inactive">("active");
+  const [formButtonText, setFormButtonText] = useState("");
+  const [formLink, setFormLink] = useState("/promotions");
+  const [formSortOrder, setFormSortOrder] = useState("0");
+  const [formIsActive, setFormIsActive] = useState(true);
   const [formImageUrl, setFormImageUrl] = useState("");
   const [formImageFile, setFormImageFile] = useState<File | null>(null);
   const [formImagePreview, setFormImagePreview] = useState("");
 
   useEffect(() => {
-    void loadCategories();
+    void loadOffers();
   }, []);
 
-  async function loadCategories() {
+  async function loadOffers() {
     setLoading(true);
     setErrorMessage("");
-    const [categoriesResult, productsResult] = await Promise.all([
-      supabase
-        .from("categories")
-        .select("id, name, description, image, status, created_at")
-        .order("created_at", { ascending: false }),
-      supabase.from("products").select("category_id"),
-    ]);
+    const { data, error } = await supabase
+      .from("offers")
+      .select("id, title, subtitle, description, button_text, image, link, is_active, sort_order")
+      .order("sort_order", { ascending: true })
+      .order("created_at", { ascending: false });
 
-    if (categoriesResult.error || productsResult.error) {
-      console.error("Categories load error:", {
-        categoriesError: categoriesResult.error,
-        productsError: productsResult.error,
-      });
-      const msg = categoriesResult.error?.message ?? productsResult.error?.message ?? "Erreur inconnue";
-      if (
-        /column .*status.* does not exist|column .*image.* does not exist/i.test(msg)
-      ) {
-        setErrorMessage(
-          "Colonnes manquantes dans categories (image/status). SQL requis: alter table categories add column if not exists image text; alter table categories add column if not exists status text default 'active';",
-        );
-      } else {
-        setErrorMessage(`Impossible de charger les catégories: ${msg}`);
-      }
-      setCategories([]);
+    if (error) {
+      console.log("offers load error:", error);
+      setErrorMessage(`Impossible de charger les offres: ${error.message}`);
+      setOffers([]);
       setLoading(false);
       return;
     }
 
-    const countsByCategory = new Map<string, number>();
-    ((productsResult.data ?? []) as DbProductCategory[]).forEach((item) => {
-      if (!item.category_id) return;
-      const key = String(item.category_id);
-      countsByCategory.set(key, (countsByCategory.get(key) ?? 0) + 1);
-    });
-
-    const mapped: Category[] = ((categoriesResult.data ?? []) as DbCategory[]).map((item) => {
-      const normalizedStatus: Category["status"] = item.status === "inactive" ? "inactive" : "active";
-      return {
-        id: String(item.id),
-        image: item.image ?? "",
-        name: item.name ?? "Categorie",
-        description: item.description ?? "",
-        productsCount: countsByCategory.get(String(item.id)) ?? 0,
-        status: normalizedStatus,
-      };
-    });
-
-    setCategories(mapped);
+    const mapped = ((data ?? []) as DbOfferRow[]).map((item) => ({
+      id: item.id,
+      title: item.title ?? "Offre",
+      subtitle: item.subtitle ?? "",
+      description: item.description ?? "",
+      buttonText: item.button_text ?? "",
+      image: item.image ?? "",
+      link: item.link ?? "/promotions",
+      sortOrder: Number(item.sort_order ?? 0),
+      isActive: Boolean(item.is_active),
+    }));
+    setOffers(mapped);
     setLoading(false);
   }
 
   function resetForm() {
-    setEditingCategory(null);
-    setFormName("");
+    setEditingOffer(null);
+    setFormTitle("");
+    setFormSubtitle("");
     setFormDescription("");
-    setFormStatus("active");
+    setFormButtonText("");
+    setFormLink("/promotions");
+    setFormSortOrder("0");
+    setFormIsActive(true);
     setFormImageUrl("");
     setFormImageFile(null);
     if (formImagePreview) URL.revokeObjectURL(formImagePreview);
@@ -147,13 +150,17 @@ export default function CategoriesPage() {
     setIsFormOpen(true);
   }
 
-  function handleEdit(category: Category) {
+  function handleEdit(offer: Offer) {
     resetForm();
-    setEditingCategory(category);
-    setFormName(category.name);
-    setFormDescription(category.description);
-    setFormStatus(category.status);
-    setFormImageUrl(category.image);
+    setEditingOffer(offer);
+    setFormTitle(offer.title);
+    setFormSubtitle(offer.subtitle);
+    setFormDescription(offer.description);
+    setFormButtonText(offer.buttonText);
+    setFormLink(offer.link || "/promotions");
+    setFormSortOrder(String(offer.sortOrder));
+    setFormIsActive(offer.isActive);
+    setFormImageUrl(offer.image);
     setIsFormOpen(true);
   }
 
@@ -161,33 +168,47 @@ export default function CategoriesPage() {
     const file = event.target.files?.[0];
     if (!file) return;
     if (formImagePreview) URL.revokeObjectURL(formImagePreview);
+    const preview = URL.createObjectURL(file);
     setFormImageFile(file);
-    setFormImagePreview(URL.createObjectURL(file));
+    setFormImagePreview(preview);
   }
 
   async function uploadImageIfNeeded() {
     if (!formImageFile) return formImageUrl;
     setUploadingImage(true);
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+
+    if (!session) {
+      setUploadingImage(false);
+      throw new Error("Session admin expirée. Veuillez vous reconnecter.");
+    }
+
     const filePath = `${Date.now()}-${formImageFile.name}`;
     const { error: uploadError } = await supabase.storage
-      .from("categories")
+      .from("offers")
       .upload(filePath, formImageFile, { upsert: true });
 
     if (uploadError) {
-      console.error("Category upload error:", uploadError);
+      console.error("Offer upload error:", uploadError);
       setUploadingImage(false);
       throw new Error(`Erreur upload image: ${uploadError.message}`);
     }
 
-    const publicUrl = supabase.storage.from("categories").getPublicUrl(filePath).data.publicUrl;
+    const publicUrl = supabase.storage.from("offers").getPublicUrl(filePath).data.publicUrl;
     setUploadingImage(false);
     return publicUrl;
   }
 
-  async function handleSaveCategory() {
+  async function handleSaveOffer() {
     setErrorMessage("");
-    if (!formName.trim()) {
-      setErrorMessage("Le nom de la catégorie est obligatoire.");
+    if (!formTitle.trim()) {
+      setErrorMessage("Le titre est obligatoire.");
+      return;
+    }
+    if (!formLink.trim()) {
+      setErrorMessage("Le lien est obligatoire.");
       return;
     }
 
@@ -195,64 +216,75 @@ export default function CategoriesPage() {
     try {
       const finalImageUrl = await uploadImageIfNeeded();
       const payload = {
-        name: formName.trim(),
+        title: formTitle.trim(),
+        subtitle: formSubtitle.trim(),
         description: formDescription.trim(),
-        status: formStatus,
+        button_text: formButtonText.trim(),
         image: finalImageUrl || null,
+        link: formLink.trim(),
+        sort_order: Number(formSortOrder || 0),
+        is_active: formIsActive,
       };
 
-      const result = editingCategory
+      const result = editingOffer
         ? await supabase
-            .from("categories")
+            .from("offers")
             .update(payload)
-            .eq("id", editingCategory.id)
-            .select("id, name, description, image, status")
+            .eq("id", editingOffer.id)
+            .select("id, title, subtitle, description, button_text, image, link, is_active, sort_order")
             .single()
         : await supabase
-            .from("categories")
+            .from("offers")
             .insert(payload)
-            .select("id, name, description, image, status")
+            .select("id, title, subtitle, description, button_text, image, link, is_active, sort_order")
             .single();
 
       if (result.error || !result.data) {
-        console.error("Category save error:", result.error);
-        setErrorMessage(result.error?.message ?? "Impossible d'enregistrer la catégorie.");
+        if (result.error) {
+          console.log("offers save error:", result.error);
+        }
+        setErrorMessage(result.error?.message ?? "Impossible d'enregistrer l'offre.");
         setSaving(false);
         return;
       }
 
-      await loadCategories();
+      await loadOffers();
       setSaving(false);
       setIsFormOpen(false);
       resetForm();
     } catch (error) {
-      console.error("Category save exception:", error);
+      console.log("offers save exception:", error);
       setErrorMessage(error instanceof Error ? error.message : "Erreur inattendue.");
       setSaving(false);
     }
   }
 
-  async function handleDelete(categoryId: string) {
-    const confirmed = window.confirm("Supprimer cette catégorie ?");
+  async function handleDeleteOffer(offerId: string) {
+    const confirmed = window.confirm("Supprimer cette offre ?");
     if (!confirmed) return;
-    const { error } = await supabase.from("categories").delete().eq("id", categoryId);
+
+    const { error } = await supabase.from("offers").delete().eq("id", offerId);
     if (error) {
-      console.error("Category delete error:", error);
+      console.log("offers delete error:", error);
       setErrorMessage(`Suppression impossible: ${error.message}`);
       return;
     }
-    await loadCategories();
+    setOffers((prev) => prev.filter((item) => item.id !== offerId));
   }
 
   const filtered = useMemo(() => {
-    return categories.filter((category) => {
+    return offers.filter((offer) => {
       const matchesSearch =
-        category.name.toLowerCase().includes(search.toLowerCase()) ||
-        category.description.toLowerCase().includes(search.toLowerCase());
-      const matchesStatus = status === "all" || category.status === status;
+        offer.title.toLowerCase().includes(search.toLowerCase()) ||
+        offer.subtitle.toLowerCase().includes(search.toLowerCase()) ||
+        offer.description.toLowerCase().includes(search.toLowerCase());
+      const matchesStatus =
+        status === "all" ||
+        (status === "active" && offer.isActive) ||
+        (status === "inactive" && !offer.isActive);
       return matchesSearch && matchesStatus;
     });
-  }, [search, status, categories]);
+  }, [offers, search, status]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / ITEMS_PER_PAGE));
   const currentPage = Math.min(page, totalPages);
@@ -262,8 +294,8 @@ export default function CategoriesPage() {
     <section className="grid max-w-full gap-6 overflow-hidden 2xl:grid-cols-[2.1fr,1fr]">
       <div className="space-y-4">
         <div>
-          <h1 className="text-3xl font-semibold text-zinc-900">Catégories</h1>
-          <p className="mt-1 text-sm text-zinc-500">Accueil / Catégories</p>
+          <h1 className="text-2xl font-semibold text-zinc-900 sm:text-3xl">Offres</h1>
+          <p className="mt-1 text-sm text-zinc-500">Accueil / Offres</p>
         </div>
 
         <div className="rounded-xl border border-zinc-200 bg-white p-4 shadow-sm">
@@ -272,7 +304,7 @@ export default function CategoriesPage() {
               <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400" />
               <input
                 type="text"
-                placeholder="Rechercher une catégorie..."
+                placeholder="Rechercher une offre..."
                 value={search}
                 onChange={(event) => {
                   setSearch(event.target.value);
@@ -299,7 +331,7 @@ export default function CategoriesPage() {
               className="inline-flex h-[46px] w-full items-center justify-center gap-2 rounded-xl bg-[#8b0637] px-4 text-sm font-semibold text-white transition hover:bg-[#74052f] sm:w-auto"
             >
               <Plus className="h-4 w-4" />
-              Ajouter une catégorie
+              Ajouter une offre
             </button>
           </div>
         </div>
@@ -313,35 +345,33 @@ export default function CategoriesPage() {
         <div className="space-y-4 md:hidden">
           {loading ? (
             <div className="rounded-xl border border-zinc-200 bg-white p-4 text-sm text-zinc-500">
-              Chargement des catégories...
+              Chargement des offres...
             </div>
           ) : paginated.length === 0 ? (
             <div className="rounded-xl border border-zinc-200 bg-white p-4 text-sm text-zinc-500">
-              Aucune catégorie trouvée.
+              Aucune offre trouvée.
             </div>
           ) : (
-            paginated.map((category) => (
-              <article key={category.id} className="rounded-2xl border border-gray-100 bg-white p-4 shadow-md">
+            paginated.map((offer) => (
+              <article key={offer.id} className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm">
                 <div className="flex items-start gap-3">
-                  <div className="inline-flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-gray-100 text-sm font-semibold text-zinc-500">
-                    <CategoryImage image={category.image} name={category.name} />
-                  </div>
+                  <OfferImage image={offer.image} title={offer.title} />
                   <div className="min-w-0 flex-1">
-                    <div className="flex items-start justify-between gap-2">
-                      <p className="line-clamp-1 text-base font-bold text-zinc-900">{category.name}</p>
-                      <Badge label={category.status === "active" ? "Actif" : "Inactif"} variant={category.status} />
+                    <p className="line-clamp-1 text-base font-semibold text-zinc-900">{offer.title}</p>
+                    <p className="line-clamp-1 text-sm text-zinc-500">{offer.subtitle || "-"}</p>
+                    <div className="mt-2 flex items-center gap-2">
+                      <Badge label={offer.isActive ? "Actif" : "Inactif"} variant={offer.isActive ? "active" : "inactive"} />
+                      <span className="text-xs text-zinc-500">Ordre: {offer.sortOrder}</span>
                     </div>
-                    <p className="mt-1 line-clamp-2 text-sm text-zinc-500">{category.description}</p>
-                    <p className="mt-2 text-xs font-medium text-zinc-600">{category.productsCount} produits</p>
                   </div>
                 </div>
-                <div className="mt-4 flex justify-end gap-2">
-                  <ActionButtons onEdit={() => handleEdit(category)} />
+                <div className="mt-3 flex items-center justify-end gap-2">
+                  <ActionButtons onEdit={() => handleEdit(offer)} />
                   <button
                     type="button"
-                    onClick={() => void handleDelete(category.id)}
+                    onClick={() => void handleDeleteOffer(offer.id)}
                     className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-red-200 text-red-600 transition hover:bg-red-50"
-                    aria-label="Supprimer la catégorie"
+                    aria-label="Supprimer l'offre"
                   >
                     <Trash2 className="h-4 w-4" />
                   </button>
@@ -352,34 +382,24 @@ export default function CategoriesPage() {
         </div>
 
         <div className="hidden max-w-full overflow-x-auto md:block">
-          <div className="min-w-[900px]">
+          <div className="min-w-[980px]">
             <DataTable
               columns={[
                 {
                   key: "image",
                   header: "Image",
-                  render: (item) => (
-                    <span className="inline-flex h-10 w-10 items-center justify-center overflow-hidden rounded-full bg-rose-50 text-xs font-semibold text-[#8b0637]">
-                      <CategoryImage image={item.image} name={item.name} />
-                    </span>
-                  ),
+                  render: (item) => <OfferImage image={item.image} title={item.title} />,
                 },
-                { key: "name", header: "Nom de la catégorie", render: (item) => item.name },
-                {
-                  key: "description",
-                  header: "Description",
-                  render: (item) => item.description,
-                },
-                {
-                  key: "count",
-                  header: "Nombre de produits",
-                  render: (item) => item.productsCount,
-                },
+                { key: "title", header: "Titre", render: (item) => item.title },
+                { key: "subtitle", header: "Sous-titre", render: (item) => item.subtitle || "-" },
+                { key: "buttonText", header: "Texte bouton", render: (item) => item.buttonText || "-" },
+                { key: "link", header: "Lien", render: (item) => item.link },
+                { key: "sortOrder", header: "Ordre", render: (item) => item.sortOrder },
                 {
                   key: "status",
                   header: "Statut",
                   render: (item) => (
-                    <Badge label={item.status === "active" ? "Actif" : "Inactif"} variant={item.status} />
+                    <Badge label={item.isActive ? "Actif" : "Inactif"} variant={item.isActive ? "active" : "inactive"} />
                   ),
                 },
                 {
@@ -390,9 +410,9 @@ export default function CategoriesPage() {
                       <ActionButtons onEdit={() => handleEdit(item)} />
                       <button
                         type="button"
-                        onClick={() => void handleDelete(item.id)}
+                        onClick={() => void handleDeleteOffer(item.id)}
                         className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-red-200 text-red-600 transition hover:bg-red-50"
-                        aria-label="Supprimer la catégorie"
+                        aria-label="Supprimer l'offre"
                       >
                         <Trash2 className="h-4 w-4" />
                       </button>
@@ -406,10 +426,10 @@ export default function CategoriesPage() {
           </div>
         </div>
 
-        <div className="flex items-center justify-between rounded-xl border border-zinc-200 bg-white px-4 py-3 text-sm shadow-sm">
+        <div className="flex flex-col gap-2 rounded-xl border border-zinc-200 bg-white px-3 py-3 text-sm shadow-sm sm:flex-row sm:items-center sm:justify-between sm:px-4">
           <p className="text-zinc-500">
-            Affichage de {filtered.length === 0 ? 0 : (currentPage - 1) * ITEMS_PER_PAGE + 1} à{" "}
-            {Math.min(currentPage * ITEMS_PER_PAGE, filtered.length)} sur {filtered.length} catégories
+            Affichage de {filtered.length === 0 ? 0 : (currentPage - 1) * ITEMS_PER_PAGE + 1} a{" "}
+            {Math.min(currentPage * ITEMS_PER_PAGE, filtered.length)} sur {filtered.length} offres
           </p>
           <div className="flex items-center gap-2">
             <button
@@ -447,21 +467,31 @@ export default function CategoriesPage() {
 
           <aside className="fixed right-0 top-0 z-50 hidden h-screen w-full max-w-xl overflow-y-auto border-l border-zinc-200 bg-white p-5 shadow-xl xl:block">
             <h2 className="text-xl font-semibold text-zinc-900">
-              {editingCategory ? "Modifier la catégorie" : "Ajouter une nouvelle catégorie"}
+              {editingOffer ? "Modifier l'offre" : "Ajouter une offre"}
             </h2>
             <form
               className="mt-5 space-y-4"
               onSubmit={(event) => {
                 event.preventDefault();
-                void handleSaveCategory();
+                void handleSaveOffer();
               }}
             >
               <label className="block">
-                <span className="mb-1.5 block text-sm font-medium text-zinc-700">Nom de la catégorie *</span>
+                <span className="mb-1.5 block text-sm font-medium text-zinc-700">Titre *</span>
                 <input
                   type="text"
-                  value={formName}
-                  onChange={(event) => setFormName(event.target.value)}
+                  value={formTitle}
+                  onChange={(event) => setFormTitle(event.target.value)}
+                  className="h-11 w-full rounded-lg border border-zinc-200 px-3 text-sm outline-none focus:ring-2 focus:ring-[#8b0637]/20"
+                />
+              </label>
+
+              <label className="block">
+                <span className="mb-1.5 block text-sm font-medium text-zinc-700">Sous-titre</span>
+                <input
+                  type="text"
+                  value={formSubtitle}
+                  onChange={(event) => setFormSubtitle(event.target.value)}
                   className="h-11 w-full rounded-lg border border-zinc-200 px-3 text-sm outline-none focus:ring-2 focus:ring-[#8b0637]/20"
                 />
               </label>
@@ -476,17 +506,49 @@ export default function CategoriesPage() {
                 />
               </label>
 
+              <div className="grid grid-cols-2 gap-3">
+                <label className="block">
+                  <span className="mb-1.5 block text-sm font-medium text-zinc-700">Texte bouton</span>
+                  <input
+                    type="text"
+                    value={formButtonText}
+                    onChange={(event) => setFormButtonText(event.target.value)}
+                    className="h-11 w-full rounded-lg border border-zinc-200 px-3 text-sm"
+                  />
+                </label>
+                <label className="block">
+                  <span className="mb-1.5 block text-sm font-medium text-zinc-700">Ordre</span>
+                  <input
+                    type="number"
+                    value={formSortOrder}
+                    onChange={(event) => setFormSortOrder(event.target.value)}
+                    className="h-11 w-full rounded-lg border border-zinc-200 px-3 text-sm"
+                  />
+                </label>
+              </div>
+
               <label className="block">
-                <span className="mb-1.5 block text-sm font-medium text-zinc-700">Image de la catégorie</span>
+                <span className="mb-1.5 block text-sm font-medium text-zinc-700">Lien *</span>
                 <input
-                  id="desktop-category-image-input"
+                  type="text"
+                  value={formLink}
+                  onChange={(event) => setFormLink(event.target.value)}
+                  placeholder="/promotions"
+                  className="h-11 w-full rounded-lg border border-zinc-200 px-3 text-sm"
+                />
+              </label>
+
+              <label className="block">
+                <span className="mb-1.5 block text-sm font-medium text-zinc-700">Image</span>
+                <input
                   type="file"
                   accept="image/*"
                   onChange={handleImageSelect}
                   className="sr-only"
+                  id="desktop-offer-image-input"
                 />
                 <label
-                  htmlFor="desktop-category-image-input"
+                  htmlFor="desktop-offer-image-input"
                   className="flex h-24 w-full cursor-pointer flex-col items-center justify-center rounded-lg border border-dashed border-zinc-300 bg-zinc-50 text-center transition hover:bg-zinc-100"
                 >
                   <Upload className="mb-2 h-5 w-5 text-zinc-500" />
@@ -495,21 +557,22 @@ export default function CategoriesPage() {
               </label>
 
               {formImagePreview || formImageUrl ? (
-                <div className="h-20 w-20 overflow-hidden rounded-lg border border-zinc-200">
-                  <CategoryImage image={formImagePreview || formImageUrl} name={formName || "Categorie"} />
-                </div>
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={formImagePreview || formImageUrl}
+                  alt="Aperçu offre"
+                  className="h-28 w-24 rounded-lg border border-zinc-200 object-cover"
+                />
               ) : null}
 
-              <label className="block">
-                <span className="mb-1.5 block text-sm font-medium text-zinc-700">Statut *</span>
-                <select
-                  value={formStatus}
-                  onChange={(event) => setFormStatus(event.target.value as "active" | "inactive")}
-                  className="h-11 w-full rounded-lg border border-zinc-200 px-3 text-sm text-zinc-700 outline-none focus:ring-2 focus:ring-[#8b0637]/20"
-                >
-                  <option value="active">Actif</option>
-                  <option value="inactive">Inactif</option>
-                </select>
+              <label className="inline-flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={formIsActive}
+                  onChange={(event) => setFormIsActive(event.target.checked)}
+                  className="h-4 w-4 rounded border-zinc-300 text-[#8b0637] focus:ring-[#8b0637]/30"
+                />
+                <span className="text-sm text-zinc-700">Offre active</span>
               </label>
 
               {uploadingImage ? (
@@ -535,7 +598,7 @@ export default function CategoriesPage() {
                   disabled={saving || uploadingImage}
                   className="h-11 rounded-lg bg-[#8b0637] text-sm font-semibold text-white transition hover:bg-[#74052f] disabled:opacity-60"
                 >
-                  {saving ? "Enregistrement..." : editingCategory ? "Mettre à jour" : "Enregistrer la catégorie"}
+                  {saving ? "Enregistrement..." : editingOffer ? "Mettre a jour" : "Enregistrer"}
                 </button>
               </div>
             </form>
@@ -551,21 +614,30 @@ export default function CategoriesPage() {
             />
             <aside className="absolute inset-x-0 bottom-0 top-0 overflow-y-auto bg-white p-5 shadow-xl">
               <h2 className="text-xl font-semibold text-zinc-900">
-                {editingCategory ? "Modifier la catégorie" : "Ajouter une nouvelle catégorie"}
+                {editingOffer ? "Modifier l'offre" : "Ajouter une offre"}
               </h2>
               <form
                 className="mt-5 space-y-4"
                 onSubmit={(event) => {
                   event.preventDefault();
-                  void handleSaveCategory();
+                  void handleSaveOffer();
                 }}
               >
                 <label className="block">
-                  <span className="mb-1.5 block text-sm font-medium text-zinc-700">Nom de la catégorie *</span>
+                  <span className="mb-1.5 block text-sm font-medium text-zinc-700">Titre *</span>
                   <input
                     type="text"
-                    value={formName}
-                    onChange={(event) => setFormName(event.target.value)}
+                    value={formTitle}
+                    onChange={(event) => setFormTitle(event.target.value)}
+                    className="h-11 w-full rounded-lg border border-zinc-200 px-3 text-sm outline-none focus:ring-2 focus:ring-[#8b0637]/20"
+                  />
+                </label>
+                <label className="block">
+                  <span className="mb-1.5 block text-sm font-medium text-zinc-700">Sous-titre</span>
+                  <input
+                    type="text"
+                    value={formSubtitle}
+                    onChange={(event) => setFormSubtitle(event.target.value)}
                     className="h-11 w-full rounded-lg border border-zinc-200 px-3 text-sm outline-none focus:ring-2 focus:ring-[#8b0637]/20"
                   />
                 </label>
@@ -578,17 +650,46 @@ export default function CategoriesPage() {
                     className="w-full rounded-lg border border-zinc-200 px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-[#8b0637]/20"
                   />
                 </label>
+                <div className="grid grid-cols-2 gap-3">
+                  <label className="block">
+                    <span className="mb-1.5 block text-sm font-medium text-zinc-700">Texte bouton</span>
+                    <input
+                      type="text"
+                      value={formButtonText}
+                      onChange={(event) => setFormButtonText(event.target.value)}
+                      className="h-11 w-full rounded-lg border border-zinc-200 px-3 text-sm"
+                    />
+                  </label>
+                  <label className="block">
+                    <span className="mb-1.5 block text-sm font-medium text-zinc-700">Ordre</span>
+                    <input
+                      type="number"
+                      value={formSortOrder}
+                      onChange={(event) => setFormSortOrder(event.target.value)}
+                      className="h-11 w-full rounded-lg border border-zinc-200 px-3 text-sm"
+                    />
+                  </label>
+                </div>
                 <label className="block">
-                  <span className="mb-1.5 block text-sm font-medium text-zinc-700">Image de la catégorie</span>
+                  <span className="mb-1.5 block text-sm font-medium text-zinc-700">Lien *</span>
                   <input
-                    id="mobile-category-image-input"
+                    type="text"
+                    value={formLink}
+                    onChange={(event) => setFormLink(event.target.value)}
+                    className="h-11 w-full rounded-lg border border-zinc-200 px-3 text-sm"
+                  />
+                </label>
+                <label className="block">
+                  <span className="mb-1.5 block text-sm font-medium text-zinc-700">Image</span>
+                  <input
+                    id="mobile-offer-image-input"
                     type="file"
                     accept="image/*"
                     onChange={handleImageSelect}
                     className="sr-only"
                   />
                   <label
-                    htmlFor="mobile-category-image-input"
+                    htmlFor="mobile-offer-image-input"
                     className="flex h-24 w-full cursor-pointer flex-col items-center justify-center rounded-lg border border-dashed border-zinc-300 bg-zinc-50 text-center transition hover:bg-zinc-100"
                   >
                     <Upload className="mb-2 h-5 w-5 text-zinc-500" />
@@ -596,20 +697,21 @@ export default function CategoriesPage() {
                   </label>
                 </label>
                 {formImagePreview || formImageUrl ? (
-                  <div className="h-20 w-20 overflow-hidden rounded-lg border border-zinc-200">
-                    <CategoryImage image={formImagePreview || formImageUrl} name={formName || "Categorie"} />
-                  </div>
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={formImagePreview || formImageUrl}
+                    alt="Aperçu offre"
+                    className="h-28 w-24 rounded-lg border border-zinc-200 object-cover"
+                  />
                 ) : null}
-                <label className="block">
-                  <span className="mb-1.5 block text-sm font-medium text-zinc-700">Statut *</span>
-                  <select
-                    value={formStatus}
-                    onChange={(event) => setFormStatus(event.target.value as "active" | "inactive")}
-                    className="h-11 w-full rounded-lg border border-zinc-200 px-3 text-sm text-zinc-700 outline-none focus:ring-2 focus:ring-[#8b0637]/20"
-                  >
-                    <option value="active">Actif</option>
-                    <option value="inactive">Inactif</option>
-                  </select>
+                <label className="inline-flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={formIsActive}
+                    onChange={(event) => setFormIsActive(event.target.checked)}
+                    className="h-4 w-4 rounded border-zinc-300 text-[#8b0637] focus:ring-[#8b0637]/30"
+                  />
+                  <span className="text-sm text-zinc-700">Offre active</span>
                 </label>
                 {uploadingImage ? (
                   <p className="inline-flex items-center gap-2 text-xs text-zinc-500">
@@ -633,7 +735,7 @@ export default function CategoriesPage() {
                     disabled={saving || uploadingImage}
                     className="h-11 rounded-lg bg-[#8b0637] text-sm font-semibold text-white transition hover:bg-[#74052f] disabled:opacity-60"
                   >
-                    {saving ? "Enregistrement..." : editingCategory ? "Mettre à jour" : "Enregistrer la catégorie"}
+                    {saving ? "Enregistrement..." : editingOffer ? "Mettre a jour" : "Enregistrer"}
                   </button>
                 </div>
               </form>
@@ -644,9 +746,9 @@ export default function CategoriesPage() {
 
       <div className="hidden 2xl:block">
         <aside className="rounded-xl border border-zinc-200 bg-white p-5 shadow-sm">
-          <h2 className="text-xl font-semibold text-zinc-900">Formulaire catégorie</h2>
+          <h2 className="text-xl font-semibold text-zinc-900">Gestion des offres</h2>
           <p className="mt-2 text-sm text-zinc-500">
-            Cliquez sur &quot;Ajouter une catégorie&quot; pour ouvrir le formulaire.
+            Les offres actives alimentent automatiquement le slider de la page d&apos;accueil.
           </p>
         </aside>
       </div>
