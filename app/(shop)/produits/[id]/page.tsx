@@ -294,7 +294,13 @@ export default function ProductDetailsPage({ params }: { params: Promise<{ id: s
 
       <section className="space-y-2 rounded-2xl border border-zinc-100 bg-white p-4 shadow-sm">
         <p className="text-xl font-semibold text-zinc-900">{product.name}</p>
-        <p className="text-sm text-zinc-500">{relationName(product.brands, "Marque")}</p>
+        {product.brand_id ? (
+          <Link href={`/marques/${product.brand_id}`} className="text-sm text-zinc-500 hover:underline">
+            {relationName(product.brands, "Marque")}
+          </Link>
+        ) : (
+          <p className="text-sm text-zinc-500">{relationName(product.brands, "Marque")}</p>
+        )}
         <p className="text-xs text-zinc-400">{relationName(product.categories, "Produit")}</p>
         <p className="text-sm text-zinc-600">{product.description || "Aucune description."}</p>
 

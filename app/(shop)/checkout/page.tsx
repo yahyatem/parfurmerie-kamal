@@ -64,9 +64,18 @@ function SummaryCard({ orderItems, subTotal, shippingFee, reduction, total }: Su
       <div className="space-y-3">
         {orderItems.map((item) => (
           <div key={item.id} className="flex items-center gap-3">
-            <div className="inline-flex h-14 w-12 shrink-0 items-center justify-center rounded-lg border border-rose-100 bg-rose-50 text-xs font-semibold text-[#97002f]">
-              {item.image}
-            </div>
+            {item.image && item.image.startsWith("http") ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={item.image}
+                alt={item.name}
+                className="h-16 w-16 rounded-xl object-cover bg-pink-50 shrink-0"
+              />
+            ) : (
+              <div className="h-16 w-16 rounded-xl bg-pink-50 flex items-center justify-center text-xs font-bold text-[#97002f] shrink-0">
+                IMG
+              </div>
+            )}
             <div className="min-w-0 flex-1">
               <p className="line-clamp-1 text-sm font-medium text-zinc-900">{item.name}</p>
               <p className="text-xs text-zinc-500">Quantite: {item.quantity}</p>

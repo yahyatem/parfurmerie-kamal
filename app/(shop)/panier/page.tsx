@@ -2,6 +2,7 @@
 
 import { Minus, Plus, ShieldCheck, Truck, Undo2, X } from "lucide-react";
 import Link from "next/link";
+import { useState } from "react";
 import { useStore } from "@/store/useStore";
 
 const benefits = [
@@ -9,6 +10,29 @@ const benefits = [
   { label: "Produits authentiques", icon: ShieldCheck },
   { label: "Retour facile", icon: Undo2 },
 ];
+
+function CartItemImage({ image, name }: { image?: string; name: string }) {
+  const [hasError, setHasError] = useState(false);
+  const canShowImage = Boolean(image && image.startsWith("http") && !hasError);
+
+  if (!canShowImage) {
+    return (
+      <div className="flex h-24 w-24 items-center justify-center rounded-xl bg-pink-50 text-xs font-bold text-[#97002f]">
+        IMG
+      </div>
+    );
+  }
+
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={image}
+      alt={name}
+      className="h-24 w-24 rounded-xl object-cover bg-pink-50"
+      onError={() => setHasError(true)}
+    />
+  );
+}
 
 export default function PanierPage() {
   const cartItems = useStore((state) => state.items);
@@ -42,8 +66,8 @@ export default function PanierPage() {
             key={item.id}
             className="relative flex gap-3 rounded-2xl border border-gray-100 bg-white p-3 shadow-sm"
           >
-            <div className="flex h-24 w-20 shrink-0 items-center justify-center rounded-xl border border-rose-100 bg-rose-50 text-sm font-semibold text-[#97002f]">
-              {item.image}
+            <div className="flex h-24 w-24 shrink-0 items-center justify-center rounded-xl border border-rose-100 bg-rose-50 text-sm font-semibold text-[#97002f]">
+              <CartItemImage image={item.image} name={item.name} />
             </div>
 
             <div className="min-w-0 flex-1">

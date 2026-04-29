@@ -150,32 +150,40 @@ export default function PromotionsPage() {
     <div className="space-y-5 overflow-x-hidden">
       <section className="space-y-3">
         <h1 className="text-3xl font-bold text-zinc-900">Promotions</h1>
-        <article className="overflow-hidden rounded-2xl border border-rose-100 bg-gradient-to-r from-rose-100 via-rose-50 to-rose-100 p-4 shadow-sm">
+        <article className="overflow-hidden rounded-2xl border border-rose-100 bg-gradient-to-r from-rose-100 via-rose-50 to-rose-100 shadow-sm">
           {loading ? (
-            <div className="h-28 animate-pulse rounded-xl bg-white/60" />
+            <div className="h-[220px] animate-pulse rounded-2xl bg-white/60 sm:h-[260px]" />
           ) : heroOffer ? (
-            <Link href={heroOffer.link ?? "/promotions"} className="grid grid-cols-[1fr,120px] items-center gap-3">
-              <div>
-                <p className="text-4xl font-bold text-[#7a0d35]">{heroOffer.title ?? "Jusqu'à -30%"}</p>
-                <p className="mt-1 text-lg text-zinc-700">{heroOffer.subtitle ?? "sur une sélection produits"}</p>
-                <span className="mt-3 inline-flex rounded-xl bg-[#7a0d35] px-4 py-2 text-sm font-semibold text-white">
-                  {heroOffer.button_text ?? "Découvrir"}
-                </span>
-              </div>
-              <div className="relative">
-                <div className="h-28 w-[110px] overflow-hidden rounded-xl bg-white/80">
-                  {heroOffer.image ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={heroOffer.image} alt={heroOffer.title ?? "Offre"} className="h-full w-full object-cover" />
-                  ) : null}
+            <Link href={heroOffer.link ?? "/promotions"} className="block">
+              <div className="relative min-h-[220px] overflow-hidden rounded-2xl border border-pink-100 bg-pink-50 shadow-sm sm:min-h-[260px]">
+                {heroOffer.image ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={heroOffer.image}
+                    alt={heroOffer.title ?? "Offre"}
+                    className="absolute inset-0 h-full w-full object-cover"
+                  />
+                ) : (
+                  <div className="absolute inset-0 bg-pink-50" />
+                )}
+                <div className="absolute inset-0 bg-gradient-to-r from-pink-50 via-pink-50/90 to-pink-50/20" />
+
+                <div className="relative z-10 p-5">
+                  <div className="max-w-[70%]">
+                    <p className="text-sm font-medium text-[#7a0d35]">{heroOffer.subtitle ?? "Offre spéciale"}</p>
+                    <p className="mt-1 text-4xl font-bold text-[#7a0d35]">{heroOffer.title ?? "Jusqu'à -30%"}</p>
+                    <p className="mt-1 text-base text-zinc-700 sm:text-lg">
+                      {heroOffer.subtitle ?? "sur une sélection produits"}
+                    </p>
+                    <span className="mt-3 inline-flex rounded-xl bg-[#7a0d35] px-4 py-2 text-sm font-semibold text-white">
+                      {heroOffer.button_text ?? "Découvrir"}
+                    </span>
+                  </div>
                 </div>
-                <span className="absolute -right-2 -top-2 rounded-full bg-[#7a0d35] px-2 py-1 text-xs font-bold text-white">
-                  Promo
-                </span>
               </div>
             </Link>
           ) : (
-            <div className="rounded-xl bg-white/80 p-4 text-sm text-zinc-600">
+            <div className="flex h-[220px] items-center justify-center rounded-2xl bg-gradient-to-r from-rose-100 via-rose-50 to-rose-100 p-4 text-sm text-zinc-600 sm:h-[260px]">
               Aucune offre active pour le moment.
             </div>
           )}
@@ -231,21 +239,28 @@ export default function PromotionsPage() {
       </section>
 
       {secondaryOffer ? (
-        <section className="overflow-hidden rounded-2xl border border-rose-100 bg-gradient-to-r from-rose-100 to-rose-50 p-4 shadow-sm">
-          <Link href={secondaryOffer.link ?? "/promotions"} className="grid grid-cols-[1fr,130px] items-center gap-3">
-            <div>
-              <p className="text-sm font-semibold text-[#7a0d35]">{secondaryOffer.subtitle ?? "Pack beauté"}</p>
-              <p className="mt-1 text-4xl font-bold text-[#7a0d35]">{secondaryOffer.title ?? "Jusqu'à -40%"}</p>
-              <p className="mt-1 text-sm text-zinc-700">{secondaryOffer.description ?? ""}</p>
-              <span className="mt-3 inline-flex rounded-xl bg-[#7a0d35] px-4 py-2 text-sm font-semibold text-white">
-                {secondaryOffer.button_text ?? "Découvrir les coffrets"}
-              </span>
-            </div>
-            <div className="h-24 w-[120px] overflow-hidden rounded-xl bg-white/80">
+        <section className="overflow-hidden rounded-2xl border border-rose-100 bg-gradient-to-r from-rose-100 to-rose-50 shadow-sm">
+          <Link href={secondaryOffer.link ?? "/promotions"} className="block">
+            <div className="relative min-h-[220px] overflow-hidden rounded-2xl border border-pink-100 bg-pink-50 shadow-sm">
               {secondaryOffer.image ? (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={secondaryOffer.image} alt={secondaryOffer.title ?? "Offre"} className="h-full w-full object-cover" />
+                <img
+                  src={secondaryOffer.image}
+                  alt={secondaryOffer.title ?? "Offre"}
+                  className="absolute inset-0 h-full w-full object-cover"
+                />
               ) : null}
+
+              <div className="absolute inset-0 bg-gradient-to-r from-pink-50 via-pink-50/90 to-pink-50/20" />
+
+              <div className="relative z-10 p-5">
+                <p className="text-sm font-semibold text-[#7a0d35]">{secondaryOffer.subtitle ?? "Pack beauté"}</p>
+                <p className="mt-1 text-4xl font-bold text-[#7a0d35]">{secondaryOffer.title ?? "Jusqu'à -40%"}</p>
+                <p className="mt-1 text-sm text-zinc-700">{secondaryOffer.description ?? ""}</p>
+                <span className="mt-3 inline-flex rounded-xl bg-[#7a0d35] px-4 py-2 text-sm font-semibold text-white">
+                  {secondaryOffer.button_text ?? "Découvrir les coffrets"}
+                </span>
+              </div>
             </div>
           </Link>
         </section>
